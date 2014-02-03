@@ -18,6 +18,6 @@ for addr in listAddresses['addresses']:
         address = json.loads(f.readline())
         results.append({ 'address': address['address'], 'balance': address['balance']})
     except IOError:
-        print "No such MSC address " + addr
+        results.append({'address': "No such MSC address " + addr, 'balance': 'NOT OK'})
 
 print json.dumps(results)
