@@ -2,8 +2,8 @@
 import sys
 import json
 
-if sys.argv[1] == '-h' or sys.argv[1] == '--help': 
-    print "\nTakes a list of MSC addresses in and outputs the balance\nUsage: cat listOfAddresses.json | getBalanceMSC.py\nRequires a fully-synced omniwallet node"
+if len(sys.argv) > 1: 
+    print "Takes a list of MSC addresses and outputs a balance in JSON \nUsage: cat listOfAddresses.json | python2 getBalanceMSC.py\nRequires a fully-synced omniwallet node"
     exit()
 
 tmp='/tmp/omniwallet/addr/'    
