@@ -2,7 +2,6 @@
     [
 	   "http://masterchain.info/mastercoin_verify/addresses/0",
 	   "https://masterchest.info/mastercoin_verify/addresses.aspx",
-	   "http://mymastercoins.com/jaddress.aspx",
-	   "http://mastercoin-explorer.com/mastercoin_verify/addresses?currency_id=0"
+	   "http://mymastercoins.com/jaddress.aspx"
     ]
 }
