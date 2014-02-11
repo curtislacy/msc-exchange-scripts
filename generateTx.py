@@ -82,7 +82,6 @@ change = largest_spendable_input['amount'] - fee_total
 # (total input amount) - (broadcast fee) - (total transaction fee)
 
 if Decimal(change) < Decimal(0) or fee_total > largest_spendable_input['amount'] and not force:
-    #__TODO__ handle gracefully and try next largest input?
     print json.dumps({ "status": "NOT OK", "error": "Not enough funds" , "fix": "Set \'force\' flag to proceed without balance checks" })
     exit()
 
@@ -94,7 +93,6 @@ sequence_number = 1    #packet number
 currency_id = 1        #MSC
 amount = int(listOptions['msc_send_amt']*1e8)  #maran's impl used float??
 
-#__TODO__ need to verify the packets are the same with IRB later
 cleartext_packet = ( 
         (hex(sequence_number)[2:].rjust(2,"0") + 
             hex(transaction_type)[2:].rjust(8,"0") +
