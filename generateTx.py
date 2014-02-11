@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import random
+import hashlib
 import operator
 import bitcoinrpc
 import pybitcointools
@@ -75,7 +76,7 @@ for unspent in unspent_tx:
 broadcast_fee = 0.0001  
 output_minimum = 0.0006 #dust threshold
 
-fee_total = Decimal(0.0001) - Decimal(0.00006 * 4)
+fee_total = Decimal(0.0001) + Decimal(0.00006 * 4)
 change = largest_spendable_input['amount'] - fee_total
 # calculate change : 
 # (total input amount) - (broadcast fee) - (total transaction fee)
@@ -100,7 +101,7 @@ cleartext_packet = (
             hex(currency_id)[2:].rjust(8,"0") +
             hex(amount)[2:].rjust(16,"0") ).ljust(62,"0") )
 
-sha_the_sender = pybitcointools.sha256(from_address).upper()[0:-2]
+sha_the_sender = hashlib.sha256(from_address).hexdigest().upper()[0:-2]
 # [0:-2] because we remove last ECDSA byte from SHA digest
 
 cleartext_bytes = map(ord,cleartext_packet.decode('hex'))  #convert to bytes for xor
@@ -126,9 +127,6 @@ while invalid:
 #the last byte of the key and try again
 
 #build transaction by hand
-pubkey = pybitcointools.compress(pubkey)
-#print pubkey
-#print data_pubkey
 
 #retrieve raw transaction to spend it
 prev_tx = conn.getrawtransaction(largest_spendable_input['txid'])
@@ -141,25 +139,16 @@ for output in prev_tx.vout:
                 validnextinputs.append({ "txid": prev_tx.txid, "vout": output['n']})
 
 validnextoutputs = { "1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P": 0.00006 , listOptions['transaction_to'] : 0.00006 }
-#validnextoutputs.append({ pubkey: 0.00006, data_pubkey: 0.00006 }) 
 
 if change > Decimal(0.00006): # send anything above dust to yourself
     validnextoutputs[ listOptions['transaction_from'] ] = float(change) 
 
-#DEBUG print validnextinputs                                `
-#DEBUG print validnextoutputs
 unsigned_raw_tx = conn.createrawtransaction(validnextinputs, validnextoutputs)
 
-signed_raw_tx = conn.signrawtransaction(unsigned_raw_tx, None, [ listOptions['from_private_key'] ])
-json_tx =  conn.decoderawtransaction(signed_raw_tx['hex'])
+json_tx =  conn.decoderawtransaction(unsigned_raw_tx)
 
 #add multisig output to json object
-json_tx['vout'].append({ "scriptPubKey": { "hex": "5121" + pubkey + "21" + data_pubkey.lower() + "52ae", "asm": "1 " + pubkey + " " + data_pubkey.lower() + " 2 OP_CHECKMULTISIG", "reqSigs": 1, "type": "multisig", "addresses": [ pybitcointools.pubkey_to_address(pubkey), pybitcointools.pubkey_to_address(data_pubkey) ] }, "value": 0.00006*2, "n": len(validnextoutputs)})
-
-#prepare inputs data for byte packing
-prior_input_txhash = json_tx['vin'][0]['txid'].upper()  
-prior_input_index = str(json_tx['vin'][0]['vout']).rjust(2,"0").ljust(8,"0")
-input_raw_signature = json_tx['vin'][0]['scriptSig']['hex']
+json_tx['vout'].append({ "scriptPubKey": { "hex": "5141" + pubkey + "21" + data_pubkey.lower() + "52ae", "asm": "1 " + pubkey + " " + data_pubkey.lower() + " 2 OP_CHECKMULTISIG", "reqSigs": 1, "type": "multisig", "addresses": [ pybitcointools.pubkey_to_address(pubkey), pybitcointools.pubkey_to_address(data_pubkey) ] }, "value": 0.00006*2, "n": len(validnextoutputs)})
 
 #construct byte arrays for transaction 
 #assert to verify byte lengths are OK
@@ -172,38 +161,52 @@ assert len(num_inputs) == 1
 num_outputs = [str(len(json_tx['vout'])).rjust(2,"0")]
 assert len(num_outputs) == 1
 
-prior_txhash_bytes =  [prior_input_txhash[ start: start + 2 ] for start in range(0, len(prior_input_txhash), 2)][::-1]
-assert len(prior_txhash_bytes) == 32
-
-prior_txindex_bytes = [prior_input_index[ start: start + 2 ] for start in range(0, len(prior_input_index), 2)]
-assert len(prior_txindex_bytes) == 4
-
-input_scriptsig = [input_raw_signature[ start: start+2].upper() for start in range(0, len(input_raw_signature), 2)]
-len_scriptsig = ['%02x' % len(''.join(input_scriptsig).decode('hex').lower())] 
-assert len(len_scriptsig) == 1
-
 sequence = ['FF', 'FF', 'FF', 'FF']
 assert len(sequence) == 4
+
+blocklocktime = ['00', '00', '00', '00']
+assert len(blocklocktime) == 4
+
+#prepare inputs data for byte packing
+inputsdata = []
+for _input in json_tx['vin']:
+    prior_input_txhash = _input['txid'].upper()  
+    prior_input_index = str(_input['vout']).rjust(2,"0").ljust(8,"0")
+    input_raw_signature = _input['scriptSig']['hex']
+    
+    prior_txhash_bytes =  [prior_input_txhash[ start: start + 2 ] for start in range(0, len(prior_input_txhash), 2)][::-1]
+    assert len(prior_txhash_bytes) == 32
+
+    prior_txindex_bytes = [prior_input_index[ start: start + 2 ] for start in range(0, len(prior_input_index), 2)]
+    assert len(prior_txindex_bytes) == 4
+
+    len_scriptsig = ['%02x' % len(''.join([]).decode('hex').lower())] 
+    assert len(len_scriptsig) == 1
+    
+    inputsdata.append([prior_txhash_bytes, prior_txindex_bytes, len_scriptsig])
 
 #prepare outputs for byte packing
 output_hex = []
 for output in json_tx['vout']:
-    value_hex = hex(int(float(output['value'])*1e8))[2:].ljust(16,"0")
-    value_bytes =  [value_hex[ start: start + 2 ].upper() for start in range(0, len(value_hex), 2)]
+    value_hex = hex(int(float(output['value'])*1e8))[2:]
+    value_hex = value_hex.rjust(16,"0")
+    value_bytes =  [value_hex[ start: start + 2 ].upper() for start in range(0, len(value_hex), 2)][::-1]
     assert len(value_bytes) == 8
 
     scriptpubkey_hex = output['scriptPubKey']['hex']
     scriptpubkey_bytes = [scriptpubkey_hex[start:start + 2].upper() for start in range(0, len(scriptpubkey_hex), 2)]
     len_scriptpubkey = ['%02x' % len(''.join(scriptpubkey_bytes).decode('hex').lower())]
-    assert len(scriptpubkey_bytes) == 25 or len(scriptpubkey_bytes) == 71
+    #assert len(scriptpubkey_bytes) == 25 or len(scriptpubkey_bytes) == 71
 
     output_hex.append([value_bytes, len_scriptpubkey, scriptpubkey_bytes] )
 
-blocklocktime = ['00', '00', '00', '00']
-assert len(blocklocktime) == 4
-
 #join parts into final byte array
-hex_transaction = version + num_inputs + prior_txhash_bytes + prior_txindex_bytes + len_scriptsig + input_scriptsig + sequence + num_outputs
+hex_transaction = version + num_inputs
+
+for _input in inputsdata:
+    hex_transaction += (_input[0] + _input[1] + _input[2] + sequence)
+
+hex_transaction += num_outputs
 
 for output in output_hex:
     hex_transaction = hex_transaction + (output[0] + output[1] + output[2]) 
@@ -212,9 +215,10 @@ hex_transaction = hex_transaction + blocklocktime
 
 #verify that transaction is valid
 assert type(conn.decoderawtransaction(''.join(hex_transaction).lower())) == type({})
-assert conn.signrawtransaction(''.join(hex_transaction))['complete'] == True
+
+#sign it
+signed_transaction = conn.signrawtransaction(''.join(hex_transaction))
 
 #output final product as JSON
-
-print json.dumps({ "rawtransaction": ''.join(hex_transaction).lower() })
+print json.dumps({ "rawtransaction": signed_transaction })
 
