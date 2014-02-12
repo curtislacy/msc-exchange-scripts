@@ -124,14 +124,14 @@ while invalid:
 #make sure the public key is valid using pybitcointools, if not, regenerate 
 #the last byte of the key and try again
 
-#build transaction by hand
+#### Build transaction
 
 #retrieve raw transaction to spend it
 prev_tx = conn.getrawtransaction(largest_spendable_input['txid'])
 
 validnextinputs = []                      #get valid redeemable inputs
 for output in prev_tx.vout:
-    if output['scriptPubKey']['reqSigs'] == 1:
+    if output['scriptPubKey']['reqSigs'] == 1 and output['scriptPubKey']['type'] != 'multisig':
         for address in output['scriptPubKey']['addresses']:
             if address == listOptions['transaction_from']:
                 validnextinputs.append({ "txid": prev_tx.txid, "vout": output['n']})
