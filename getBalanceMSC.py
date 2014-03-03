@@ -6,7 +6,7 @@ if len(sys.argv) > 1:
     print "Takes a list of MSC addresses and outputs a balance in JSON \nUsage: cat listOfAddresses.json | python2 getBalanceMSC.py\nRequires a fully-synced omniwallet node"
     exit()
 
-tmp='/tmp/omniwallet/addr/'    
+tmp='/var/lib/omniwallet/addr/'    
 
 JSON = sys.stdin.readlines()
 
