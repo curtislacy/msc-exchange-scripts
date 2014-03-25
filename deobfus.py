@@ -10,7 +10,7 @@ from decimal import *
 
 
 if len(sys.argv) > 1 and "--force" not in sys.argv: 
-    print "no support given :) "
+    print "\ncat deobfus.json| python2 deobfus.py, see https://github.com/curtislacy/msc-exchange-scripts/pull/6 for more"
     exit()
 
 JSON = sys.stdin.readlines()
