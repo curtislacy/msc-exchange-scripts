@@ -1,0 +1,4 @@
+{ 
+  "transaction": "{{tx hash here}}",
+  "reference": "{{sender address here}}"
+}
